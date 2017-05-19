@@ -1,0 +1,333 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Parameters": {
+        "KeyName": {
+            "Description": "Name of an existing EC2 KeyPair to enable SSH access to the ECS instances.",
+            "Type": "String",
+            "Default": ""
+        },
+        "vpc": {
+            "Description": "vpc-id",
+            "Type": "String",
+            "Default": ""
+        },
+        "SubnetAzA": {
+            "Description": "Subnet to deploy",
+            "Type": "String",
+            "Default": ""
+        },
+        "SubnetAzB": {
+            "Description": "Subnet to deploy",
+            "Type": "String",
+            "Default": ""
+        },
+        "SubnetAzC": {
+            "Description": "Subnet to deploy",
+            "Type": "String",
+            "Default": ""
+        },
+        "NumberOfInstances": {
+            "Description": "Number of desired Instances",
+            "Type": "Number",
+            "Default": 3
+        },
+        "ImageId": {
+            "Description": "Ami ID",
+            "Type": "String",
+            "Default": ""
+        },
+        "InstanceType": {
+            "Description": "Instance size you would like to deploy",
+            "Type": "String",
+            "Default": "t2.small"
+        }
+    },
+    "Resources": {
+        "ECSCluster": {
+            "Type": "AWS::ECS::Cluster"
+        },
+
+        "CloudwatchLogsGroup": {
+            "Type": "AWS::Logs::LogGroup",
+            "Properties": {
+                "LogGroupName": {
+                    "Fn::Join": [
+                        "-",
+                        [
+                            "ECSLogGroup",
+                            {
+                                "Ref": "AWS::StackName"
+                            }
+                        ]
+                    ]
+                },
+                "RetentionInDays": 14
+            }
+        },
+
+        "albSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "SG for load balancers",
+                "VpcId": {
+                    "Ref": "vpc"
+                },
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "CidrIp": "0.0.0.0/0",
+                        "FromPort": "80",
+                        "ToPort": "80"
+                    },
+                    {
+                        "IpProtocol": "tcp",
+                        "CidrIp": "0.0.0.0/0",
+                        "FromPort": "443",
+                        "ToPort": "443"
+                    }
+                ]
+            }
+        },
+
+        "ecsSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "SG for load balancers",
+                "VpcId": {
+                    "Ref": "vpc"
+                },
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "CidrIp": "0.0.0.0/0",
+                        "FromPort": "22",
+                        "ToPort": "22"
+                    }
+                ]
+            }
+        },
+
+        "ingressRule000": {
+            "Type": "AWS::EC2::SecurityGroupIngress",
+            "Properties": {
+                "GroupId": { "Ref": "ecsSecurityGroup" },
+                "IpProtocol": "tcp",
+                "FromPort": "0",
+                "ToPort": "65535",
+                "SourceSecurityGroupId": { "Ref": "albSecurityGroup" }
+            }
+        },
+
+        "ECSAutoScalingGroup": {
+            "Type": "AWS::AutoScaling::AutoScalingGroup",
+            "Properties": {
+                "VPCZoneIdentifier": [
+                    {
+                        "Ref": "SubnetAzA"
+                    },
+                    {
+                        "Ref": "SubnetAzB"
+                    },
+                    {
+                        "Ref": "SubnetAzC"
+                    }
+                ],
+                "LaunchConfigurationName": {
+                    "Ref": "ContainerInstances"
+                },
+                "MinSize": "1",
+                "MaxSize": "10",
+                "DesiredCapacity": {
+                    "Ref": "NumberOfInstances"
+                }
+            }
+        },
+        "ContainerInstances": {
+            "Type": "AWS::AutoScaling::LaunchConfiguration",
+            "Properties": {
+                "ImageId": {
+                    "Ref": "ImageId"
+                },
+                "InstanceType": {
+                    "Ref": "InstanceType"
+                },
+                "IamInstanceProfile": {
+                    "Ref": "EC2InstanceProfile"
+                },
+                "KeyName": {
+                    "Ref": "KeyName"
+                },
+                "AssociatePublicIpAddress": "True",
+                "SecurityGroups": [
+                  {"Ref": "ecsSecurityGroup"}
+                ],
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "#cloud-config\n\n",
+                                "coreos:\n",
+                                "  units:\n",
+                                "    -\n",
+                                "      name: amazon-ecs-agent.service\n",
+                                "      command: start\n",
+                                "      runtime: true\n",
+                                "      content: |\n",
+                                "        [Unit]\n",
+                                "        Description=AWS ECS Agent\n",
+                                "        Requires=docker.socket\n",
+                                "        After=docker.socket\n\n",
+                                "        [Service]\n",
+                                "        Environment=ECS_CLUSTER=",
+                                {
+                                    "Ref": "ECSCluster"
+                                },
+                                "\n",
+                                "        Environment=ECS_LOGLEVEL=info\n",
+                                "        Environment=ECS_VERSION=latest\n",
+                                "        Restart=on-failure\n",
+                                "        RestartSec=30\n",
+                                "        RestartPreventExitStatus=5\n",
+                                "        SyslogIdentifier=ecs-agent\n",
+                                "        ExecStartPre=-/bin/mkdir -p /var/log/ecs /var/ecs-data /etc/ecs\n",
+                                "        ExecStartPre=-/usr/bin/touch /etc/ecs/ecs.config\n",
+                                "        ExecStartPre=-/usr/bin/docker kill ecs-agent\n",
+                                "        ExecStartPre=-/usr/bin/docker rm ecs-agent\n",
+                                "        ExecStartPre=-/usr/sbin/sysctl -w net.ipv4.conf.all.route_localnet=1\n",
+                                "        ExecStartPre=-/usr/sbin/iptables -t nat -A PREROUTING -p tcp -d 169.254.170.2 --dport 80 -j DNAT --to-destination 127.0.0.1:51679\n",
+                                "        ExecStartPre=-/usr/sbin/iptables -t nat -A OUTPUT -d 169.254.170.2 -p tcp -m tcp --dport 80 -j REDIRECT --to-ports 51679\n",
+                                "        ExecStartPre=/usr/bin/docker pull amazon/amazon-ecs-agent:${ECS_VERSION}\n",
+                                "        ExecStart=/usr/bin/docker run --name ecs-agent --net=host --env-file=/etc/ecs/ecs.config --volume=/var/run/docker.sock:/var/run/docker.sock --volume=/var/log/ecs:/log --volume=/var/ecs-data:/data --volume=/sys/fs/cgroup:/sys/fs/cgroup:ro --volume=/run/docker/execdriver/native:/var/lib/docker/execdriver/native:ro --publish=127.0.0.1:51678:51678 --env=ECS_LOGFILE=/log/ecs-agent.log --env=ECS_LOGLEVEL=${ECS_LOGLEVEL} --env=ECS_DATADIR=/data --env=ECS_CLUSTER=${ECS_CLUSTER} --env=ECS_ENABLE_TASK_IAM_ROLE=true --env=ECS_ENABLE_TASK_IAM_ROLE_NETWORK_HOST=true amazon/amazon-ecs-agent:${ECS_VERSION}\n",
+                                "        ExecStop=/usr/bin/docker stop ecs-agent\n"
+                            ]
+                        ]
+                    }
+                }
+            }
+        },
+        "EC2Role": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "ec2.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyName": "ecs-service",
+                        "PolicyDocument": {
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ecs:CreateCluster",
+                                        "ecs:DeregisterContainerInstance",
+                                        "ecs:DiscoverPollEndpoint",
+                                        "ecs:Poll",
+                                        "ecs:RegisterContainerInstance",
+                                        "ecs:StartTelemetrySession",
+                                        "ecs:Submit*",
+                                        "logs:CreateLogStream",
+                                        "logs:PutLogEvents",
+                                        "ecr:*"
+                                    ],
+                                    "Resource": "*"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "EC2InstanceProfile": {
+            "Type": "AWS::IAM::InstanceProfile",
+            "Properties": {
+                "Path": "/",
+                "Roles": [
+                    {
+                        "Ref": "EC2Role"
+                    }
+                ]
+            }
+        },
+        "ecsRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "ecs.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyName": "ecs-service",
+                        "PolicyDocument": {
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ec2:AuthorizeSecurityGroupIngress",
+                                        "ec2:Describe*",
+                                        "elasticloadbalancing:DeregisterInstancesFromLoadBalancer",
+                                        "elasticloadbalancing:DeregisterTargets",
+                                        "elasticloadbalancing:Describe*",
+                                        "elasticloadbalancing:RegisterInstancesWithLoadBalancer",
+                                        "elasticloadbalancing:RegisterTargets"
+                                    ],
+                                    "Resource": "*"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "ecsInstanceProfile": {
+            "Type": "AWS::IAM::InstanceProfile",
+            "Properties": {
+                "Path": "/",
+                "Roles": [
+                    {
+                        "Ref": "ecsRole"
+                    }
+                ]
+            }
+        }
+    },
+    "Outputs": {
+        "ecscluster": {
+            "Value": {
+                "Ref": "ECSCluster"
+            }
+        },
+        "albSecurityGroup": {
+            "Value": {
+                "Ref": "albSecurityGroup"
+            }
+        }
+    }
+}

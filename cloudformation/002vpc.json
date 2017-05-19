@@ -1,0 +1,91 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Template - Public Routing",
+    "Parameters": {
+        "vpc": {
+            "Description": "vpcid is retrieved from 001vpc.json",
+            "Type": "String",
+            "Default": "",
+            "ConstraintDescription": ""
+        }
+    },
+    "Resources": {
+
+        "internetGateway": {
+            "Type": "AWS::EC2::InternetGateway",
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "Application",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "Public"
+                    }
+                ]
+            }
+        },
+
+        "attachGateway": {
+            "Type": "AWS::EC2::VPCGatewayAttachment",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "vpc"
+                },
+                "InternetGatewayId": {
+                    "Ref": "internetGateway"
+                }
+            }
+        },
+
+        "publicRouteTable": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "vpc"
+                },
+                "Tags": [
+                    {
+                        "Key": "Application",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "Public"
+                    }
+                ]
+            }
+        },
+
+        "publicRoute": {
+            "Type": "AWS::EC2::Route",
+            "DependsOn" : "attachGateway",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "publicRouteTable"
+                },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": {
+                    "Ref": "internetGateway"
+                }
+            }
+        }
+
+    },
+
+    "Outputs": {
+
+        "publicRouteTable": {
+            "Value": {
+                "Ref": "publicRouteTable"
+            },
+            "Description": "public route table id"
+        }
+
+    }
+}

@@ -1,0 +1,59 @@
+---
+# ansible-playbook main2.yml -i inventory -e env=$env
+- name: Provision AWS ECS Environment
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+  - vars/{{ env }}.yml
+
+  tasks:
+
+  - name: Provision VPC
+    cloudformation:
+      stack_name: "{{stackPrefix}}-vpc"
+      state: "present"
+      disable_rollback: true
+      region: "{{region}}"
+      template: "cloudformation/001vpc.json"
+      template_parameters:
+        vpcCidr: "{{vpcCidr}}"
+      tags:
+        Stack: "vpc deployment"
+        Phase: "base vpc"
+        Env: "engineering"
+    register: vpc001
+
+  - name: Provision IGW and Public RouteTable
+    cloudformation:
+      stack_name: "{{stackPrefix}}-publicRouting"
+      state: "present"
+      disable_rollback: true
+      region: "{{region}}"
+      template: "cloudformation/002vpc.json"
+      template_parameters:
+        vpc: "{{vpc001.stack_outputs.vpc}}"
+      tags:
+        Stack: "vpc deployment"
+        Phase: "public routing"
+        Env: "engineering"
+    register: vpc002
+
+  - name: provision public subnets
+    cloudformation:
+      stack_name: "{{stackPrefix}}-publicSubnets"
+      state: "present"
+      disable_rollback: true
+      region: "{{region}}"
+      template: "cloudformation/003vpc.json"
+      template_parameters:
+        vpc: "{{vpc001.stack_outputs.vpc}}"
+        publicRouteTable: "{{vpc002.stack_outputs.publicRouteTable}}"
+        secondOctect: "{{secondOctect}}"
+        region: "{{region}}"
+      tags:
+        Stack: "vpc deployment"
+        Phase: "public subnets"
+        Env: "engineering"
+    register: vpc003

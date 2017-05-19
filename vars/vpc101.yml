@@ -1,0 +1,10 @@
+---
+# global vars
+stackPrefix: "vpcDemo"
+
+# used in vpc001.json
+vpcCidr: "10.175.0.0/16"
+
+# used in vpc003.json
+secondOctect: "175"
+region: "us-west-2"

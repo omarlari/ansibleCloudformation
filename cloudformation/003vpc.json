@@ -1,0 +1,215 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Template - Public Subnets",
+    "Parameters": {
+        "vpc": {
+            "Description": "vpcid output from 001vpc.json",
+            "Type": "String",
+            "Default": "",
+            "ConstraintDescription": ""
+        },
+        "publicRouteTable": {
+            "Description": "public route table output from 002vpc.json",
+            "Type": "String",
+            "Default": "",
+            "ConstraintDescription": ""
+        },
+        "secondOctect": {
+            "Description": "this parameter will be retrieved from the ansible vars",
+            "Type": "String",
+            "Default": "",
+            "ConstraintDescription": ""
+        },
+        "region":{
+            "Description": "this parameter will be retrieved from the ansible vars",
+            "Type": "String",
+            "Default": "",
+            "ConstraintDescription": ""
+        }
+
+    },
+    "Resources": {
+
+        "publicSubnetAzA": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "AvailabilityZone": {"Fn::Join": [
+                    "",
+                    [
+                        {
+                            "Ref": "region"
+                        },
+                        "a"
+                    ]
+                ]},
+                "VpcId": {
+                     "Ref": "vpc"
+                },
+                "CidrBlock": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            "10.",
+                            {
+                                "Ref": "secondOctect"
+                            },
+                            ".100",
+                            ".0",
+                            "/24"
+                        ]
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Application",
+                        "Value":
+                        {
+                            "Ref": "AWS::StackName"
+                        }
+                    }
+                ]
+            }
+        },
+
+        "publicRouteTableAssociation001": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "publicSubnetAzA"
+                },
+                "RouteTableId": {
+                    "Ref": "publicRouteTable"
+                }
+            }
+        },
+
+        "publicSubnetAzB": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "AvailabilityZone": {"Fn::Join": [
+                    "",
+                    [
+                        {
+                            "Ref": "region"
+                        },
+                        "b"
+                    ]
+                ]},
+                "VpcId": {
+                     "Ref": "vpc"
+                },
+                "CidrBlock": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            "10.",
+                            {
+                                "Ref": "secondOctect"
+                            },
+                            ".101",
+                            ".0",
+                            "/24"
+                        ]
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Application",
+                        "Value":
+                        {
+                            "Ref": "AWS::StackName"
+                        }
+                    }
+                ]
+            }
+        },
+
+        "publicRouteTableAssociation002": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "publicSubnetAzB"
+                },
+                "RouteTableId": {
+                    "Ref": "publicRouteTable"
+                }
+            }
+        },
+
+        "publicSubnetAzC": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "AvailabilityZone": {"Fn::Join": [
+                    "",
+                    [
+                        {
+                            "Ref": "region"
+                        },
+                        "c"
+                    ]
+                ]},
+                "VpcId": {
+                     "Ref": "vpc"
+                },
+                "CidrBlock": {
+                    "Fn::Join": [
+                        "",
+                        [
+                            "10.",
+                            {
+                                "Ref": "secondOctect"
+                            },
+                            ".102",
+                            ".0",
+                            "/24"
+                        ]
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Application",
+                        "Value":
+                        {
+                            "Ref": "AWS::StackName"
+                        }
+                    }
+                ]
+            }
+        },
+
+        "publicRouteTableAssociation003": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "publicSubnetAzC"
+                },
+                "RouteTableId": {
+                    "Ref": "publicRouteTable"
+                }
+            }
+        }
+    },
+
+    "Outputs":
+    {
+
+      "publicSubnetAzA" : {
+        "Value" : {
+          "Ref" : "publicSubnetAzA"
+        }
+      },
+
+      "publicSubnetAzB" : {
+        "Value" : {
+          "Ref" : "publicSubnetAzB"
+        }
+      },
+
+      "publicSubnetAzC" : {
+        "Value" : {
+          "Ref" : "publicSubnetAzC"
+        }
+      }
+
+    }
+}

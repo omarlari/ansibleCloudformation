@@ -1,0 +1,46 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Template - Base VPC",
+    "Parameters": {
+        "vpcCidr": {
+            "Description": "CIDR notation for VPC",
+            "Type": "String",
+            "Default": "",
+            "ConstraintDescription": "include slash and subnet space"
+        }
+    },
+    "Resources": {
+        "vpc": {
+            "Type": "AWS::EC2::VPC",
+            "Properties": {
+                "CidrBlock": {
+                    "Ref" : "vpcCidr"
+                },
+                "Tags": [
+                    {
+                        "Key": "Application",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "Public"
+                    }
+                ]
+            }
+        }
+
+    },
+
+    "Outputs": {
+
+        "vpc": {
+            "Value": {
+                "Ref": "vpc"
+            },
+            "Description": "vpcId"
+        }
+
+    }
+}
