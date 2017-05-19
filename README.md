@@ -1,2 +1,1 @@
-# awsCoreEcsCluster
-# Demo of Ansible Cloudformation Module
+#Demo of Ansible Cloudformation Module
